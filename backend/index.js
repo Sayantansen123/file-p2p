@@ -1,30 +1,62 @@
 import express from "express";
-import http from "http";
-import cors from "cors";
 import { WebSocketServer } from "ws";
+import { v4 as uuidv4 } from "uuid"; // To generate unique session IDs
+import cors from "cors";
 
 const app = express();
 app.use(cors());
 
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const PORT = 5000;
+const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-let clients = [];
+const wss = new WebSocketServer({ server });
+const sessions = {};
 
 wss.on("connection", (ws) => {
-  clients.push(ws);
-
   ws.on("message", (message) => {
-    clients.forEach((client) => {
-      if (client !== ws && client.readyState === ws.OPEN) {
-        client.send(message); // Forward messages (SDP, ICE) to the other peer
+    const data = JSON.parse(message);
+    
+    if (data.type === "createSession") {
+      // Generate unique session ID
+      const sessionId = uuidv4();
+      sessions[sessionId] = [ws];
+      ws.sessionId = sessionId;
+      ws.send(JSON.stringify({ type: "sessionCreated", sessionId }));
+    }
+
+    if (data.type === "joinSession") {
+      const { sessionId } = data;
+      if (sessions[sessionId]) {
+        sessions[sessionId].push(ws);
+        ws.sessionId = sessionId;
+        ws.send(JSON.stringify({ type: "sessionJoined", sessionId }));
+        sessions[sessionId].forEach(client => {
+          if (client !== ws) {
+            client.send(JSON.stringify({ type: "peerJoined" }));
+          }
+        });
+      } else {
+        ws.send(JSON.stringify({ type: "error", message: "Session not found" }));
       }
-    });
+    }
+
+    if (data.type === "signal") {
+      const { sessionId, signal } = data;
+      sessions[sessionId]?.forEach(client => {
+        if (client !== ws) {
+          client.send(JSON.stringify({ type: "signal", signal }));
+        }
+      });
+    }
   });
 
   ws.on("close", () => {
-    clients = clients.filter((client) => client !== ws);
+    const { sessionId } = ws;
+    if (sessionId && sessions[sessionId]) {
+      sessions[sessionId] = sessions[sessionId].filter(client => client !== ws);
+      if (sessions[sessionId].length === 0) {
+        delete sessions[sessionId];
+      }
+    }
   });
 });
-
-server.listen(5000, () => console.log("WebSocket server running on port 5000"));
