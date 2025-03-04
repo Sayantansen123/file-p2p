@@ -1,7 +1,7 @@
-import express from "express";
-import { WebSocketServer } from "ws";
-import { v4 as uuidv4 } from "uuid"; // To generate unique session IDs
-import cors from "cors";
+const express = require("express");
+const { WebSocketServer } = require("ws");
+const { v4: uuidv4 } = require("uuid");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
@@ -10,17 +10,19 @@ const PORT = 5000;
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 const wss = new WebSocketServer({ server });
-const sessions = {};
+const sessions = {}; // Stores active sessions
 
 wss.on("connection", (ws) => {
+  console.log("New client connected");
+
   ws.on("message", (message) => {
     const data = JSON.parse(message);
-    
+
     if (data.type === "createSession") {
-      // Generate unique session ID
       const sessionId = uuidv4();
       sessions[sessionId] = [ws];
       ws.sessionId = sessionId;
+      console.log(`Session created: ${sessionId}`);
       ws.send(JSON.stringify({ type: "sessionCreated", sessionId }));
     }
 
@@ -29,6 +31,7 @@ wss.on("connection", (ws) => {
       if (sessions[sessionId]) {
         sessions[sessionId].push(ws);
         ws.sessionId = sessionId;
+        console.log(`User joined session: ${sessionId}`);
         ws.send(JSON.stringify({ type: "sessionJoined", sessionId }));
         sessions[sessionId].forEach(client => {
           if (client !== ws) {
@@ -40,23 +43,24 @@ wss.on("connection", (ws) => {
       }
     }
 
-    if (data.type === "signal") {
-      const { sessionId, signal } = data;
+    if (data.type === "file") {
+      const { sessionId, fileName, fileData } = data;
+      console.log(`File received in session ${sessionId}: ${fileName}`);
+
       sessions[sessionId]?.forEach(client => {
         if (client !== ws) {
-          client.send(JSON.stringify({ type: "signal", signal }));
+          client.send(JSON.stringify({ type: "file", fileName, fileData }));
         }
       });
     }
   });
 
   ws.on("close", () => {
+    console.log("Client disconnected");
     const { sessionId } = ws;
     if (sessionId && sessions[sessionId]) {
       sessions[sessionId] = sessions[sessionId].filter(client => client !== ws);
-      if (sessions[sessionId].length === 0) {
-        delete sessions[sessionId];
-      }
+      if (sessions[sessionId].length === 0) delete sessions[sessionId];
     }
   });
 });

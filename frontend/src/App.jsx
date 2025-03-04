@@ -1,5 +1,6 @@
 
 import RotatingText from "./RotatingText"
+import WebRTCFileTransfer from "./WebRTCFileTransfer"
 
 
 function App() {
@@ -29,6 +30,10 @@ function App() {
 
        <div className=" text-center mt-7 max-sm:text-start p-6 relative max-sm:mt-3">
         <p >Our P2P File Sharer is designed to provide a lightweight, efficient, and decentralized way<br /> to transfer files directly between users without relying on third-party servers.<br /> Whether you’re sharing documents, images, or large media files,<br /> our platform ensures fast, encrypted, and real-time file transfers using WebRTC technology.</p>
+        <div className="mt-10"> 
+          <WebRTCFileTransfer/>
+          </div>
+       
        </div>
 
       </div>
