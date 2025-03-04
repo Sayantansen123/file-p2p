@@ -17,7 +17,7 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (message) => {
     const data = JSON.parse(message);
-
+    console.log(data);
     if (data.type === "createSession") {
       const sessionId = uuidv4();
       sessions[sessionId] = [ws];
